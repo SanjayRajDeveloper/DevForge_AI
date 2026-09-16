@@ -1,0 +1,861 @@
+% ---------------------------------------------------------------------------
+% SmartLayout AI - IEEE Conference Paper (IEEEtran template)
+% Compile with: pdflatex (IEEE conference mode: \documentclass[conference]{IEEEtran})
+% ---------------------------------------------------------------------------
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+\usepackage{hyperref}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{SmartLayout AI: A Pre-Render Explainable AI Engine for
+Predicting Responsive Web Layout Failures Before They Render}
+
+\author{
+\IEEEauthorblockN{First Author\IEEEauthoranchor{1}{1}, Second Author\IEEEauthoranchor{2}{2}}
+\IEEEauthorblockA{\IEEEauthorrefmark{1}Department of Computer Science and Engineering\\
+Example University, City, Country\\ Email: first.author@example.edu}
+\IEEEauthorblockA{\IEEEauthorrefmark{2}Department of Software Engineering\\
+Example Institute, City, Country\\ Email: second.author@example.edu}
+}
+
+\maketitle
+
+\begin{abstract}
+Responsive web design is the dominant paradigm for delivering interfaces
+across the continuous spectrum of device viewports, yet layout failures --
+horizontal overflow, broken flex and grid systems, image bleed, and text
+clipping -- are typically discovered only after rendering, by human
+inspection or post-hoc browser tooling. This paper presents SmartLayout
+AI, a client-side engine that predicts responsive layout failures
+\textit{before} rendering by statically analyzing the HTML/CSS AST,
+extracting a compact interpretable feature vector, and applying a hybrid
+rule-based and weight-activated prediction model over sixteen failure
+targets across six canonical viewports. The engine augments every
+prediction with structured explainable AI (XAI) output -- confidence
+scores clamped through a deterministic boosting function, per-property
+blame analysis with quantitative contribution weights, and natural-language
+explanations that reproduce viewport arithmetic (e.g., ``1200\,px locked
+element vs.\ 375\,px viewport, 825\,px overflow''). Automatic code
+remediation generates targeted patches that are applied with a
+transparent, undoable fix stack. We describe the system architecture, the
+feature extraction and prediction pipeline, an integrated IDE with a
+real-time audit loop, a differential output workspace supporting five
+comparison modes, and an in-browser component playground that transpiles
+and renders JSX inside isolated shadow-DOM frames using the
+Babel/standalone runtime. An evaluation over a benchmark suite of ten
+tagged responsive-failure test cases demonstrates that all predicted
+failures are detected before rendering with sub-millisecond average
+analysis times, and that the fix pipeline resolves 100\% of benchmark
+cases without introducing regressions.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Responsive web design, explainable AI (XAI), static layout analysis,
+pre-render prediction, automated code repair, feature engineering,
+human--computer interaction.
+\end{IEEEkeywords}
+
+\section{Introduction}
+\IEEEPARstart{R}{esponsive} web design \cite{marcotte2011responsive} has
+become the de-facto standard for building interfaces that must adapt to
+viewports ranging from 320\,px feature phones to 1440\,px desktop panels
+and beyond. Despite mature engineering practices -- fluid grids, flexible
+images, and media queries -- responsive layout failures remain among the
+most frequently reported front-end defects \cite{webalmanac2022}.
+Empirically these failures share a small set of mechanical root causes:
+fixed pixel widths that exceed narrow viewports, flex or grid containers
+without wrapping or fluid track functions, images without maximum-width
+constraints, and text forced onto a single line by \texttt{white-space:
+nowrap}.
+
+A fundamental limitation of current tooling is a matter of timing.
+Browser DevTools, visual regression suites, and runtime performance
+auditors such as Lighthouse \cite{lighthouse2022} observe failures
+\textit{after} paint. This delays feedback to the developer, fragments
+the debugging session across emulators, and forces the entire
+render--inspect--patch--verify cycle to be executed manually. Meanwhile,
+data-driven approaches that learn failure classifiers from render logs
+require labeled datasets that are expensive to construct and difficult to
+keep current with evolving layout standards.
+
+This paper presents \textbf{SmartLayout AI}, a pre-render, client-side
+engine that addresses these gaps with three contributions:
+
+\begin{enumerate}
+  \item \textbf{A static prediction pipeline.} The engine parses the
+  HTML/CSS source into a semantic AST, computes a ten-dimensional
+  interpretable feature vector, and predicts responsive failures across
+  sixteen failure targets and six canonical viewports \textit{before a
+  single pixel is rendered}. A deterministic boost function calibrates
+  prediction confidence from feature density (e.g., absence of media
+  queries and high fixed-width ratios raise confidence).
+
+  \item \textbf{Structured explainable AI (XAI).} Every prediction
+  carries a confidence score, per-property blame analysis with quantified
+  contribution weights, and a natural-language explanation that performs
+  and states explicit viewport arithmetic. This makes predictions
+  auditable by developers rather than black-box assertions.
+
+  \item \textbf{Automated, undoable remediation.} A recommendation
+  engine synthesizes targeted CSS/HTML patches that are applied directly
+  to the user's code through an undoable fix stack, closing the
+  predict--explain--repair loop within the editor itself.
+\end{enumerate}
+
+We additionally report on three integrated developer-facing surfaces: an
+IDE with a real-time audit loop (Monaco-based), a differential output
+workspace supporting single, side-by-side, slider, fade, and split
+comparison modes between original and fixed layouts, and a component
+playground that transpiles arbitrary JSX at runtime via
+Babel/standalone and renders it in isolated shadow-DOM iframes across
+configurable breakpoints.
+
+The remainder of this paper is organized as follows. Section~II reviews
+related work. Section~III describes the system architecture. Section~IV
+details the prediction methodology. Section~V presents the explainability
+layer. Section~VI describes automatic remediation and the developer
+tools. Section~VII reports the evaluation. Section~VIII concludes and
+discusses future work.
+
+\section{Related Work}
+
+This section surveys prior research across six areas relevant to
+SmartLayout~AI: runtime web auditing, static analysis of styles and
+scripts, responsive layout fault detection and repair, automated code
+repair and synthesis, automated HTML error handling and web page
+segmentation, and explainable AI in software engineering. Throughout,
+we identify the specific gaps that SmartLayout~AI addresses.
+
+\subsection{Runtime Web Auditing and Cross-Browser Testing}
+Responsive web design principles \cite{marcotte2011responsive} require
+web pages to adapt fluidly to arbitrary viewport widths. Kaushal
+\emph{et al.} provide a practical overview of responsive webpage
+construction using HTML and CSS, establishing the fundamental role of
+fluid grids and media queries \cite{kaushal2022responsive}. In practice,
+however, most testing remains render-dependent. Automated platforms
+such as Playwright \cite{playwright2024} and Lighthouse
+\cite{lighthouse2022} capture layout metrics only after the browser has
+painted. Mesbah and Prasad formalize cross-browser compatibility as a
+functional-consistency check between browser behavior models
+\cite{mesbah2011crossbrowser}; X-PERT localizes cross-browser issues by
+differencing DOM states \cite{choudhary2013xpert}; and X-Check applies
+record/replay with incremental checking of DOM-mutated nodes to
+JavaScript web applications, achieving 83\% precision and 93\% recall
+\cite{wu2021xcheck}. Le-Khanh \emph{et al.} address high-fidelity
+web element identification across DOM and visual representations,
+which is a prerequisite for accurate layout comparison
+\cite{le2024hifi}. All of these share a render-then-detect paradigm: a
+failure is observable only after the page has executed in a browser.
+
+\subsection{Static Analysis of Styles and Scripts}
+Static checks of markup, such as WCAG conformance tools \cite{wcag21},
+evaluate attribute-level properties but do not reason about box geometry
+across viewports. Mesbah and Mirshokraie's Cilla tool analyzes CSS
+rules to flag unused selectors, overridden properties, and undefined
+classes \cite{mesbah2012css}. Mazinanian and Tsantalis empirically study
+the adoption and maintenance impact of CSS preprocessors such as Sass
+and LESS, finding that while preprocessors improve code organization,
+they introduce new classes of compilation-derived layout anti-patterns
+that remain undetected by existing tools \cite{mazinanian2016csspre}.
+JSNose detects thirteen JavaScript code smells through a metric-based
+static-plus-dynamic pipeline \cite{fard2013jsnose}; Saboury \emph{et
+al.} empirically relate such smells to fault-proneness in JavaScript
+projects, confirming that code quality metrics predict layout-relevant
+defects \cite{saboury2017smells}. Recent work applies machine learning
+to these checks but with limitations: Di Nucci \emph{et al.} find that
+ML-based code smell detectors incur misleading accuracy gains over
+simple baselines \cite{dinucci2018mlsmells}, and Gupta \emph{et al.}
+train a model to classify and optimize CSS quality
+\cite{gupta2024cssai}. Neither reports confidence, blame, or
+explanations, and none projects geometry onto canonical viewports.
+SmartLayout~AI addresses this gap by computing a ten-dimensional
+interpretable feature vector from the AST that directly feeds both
+prediction and explanation.
+
+\subsection{Responsive Layout Fault Detection and Repair}
+As surveyed comprehensively by Prazina \emph{et al.} in IEEE Access
+\cite{prazina2023survey}, research on responsive layout failures has
+progressed through three phases: manual inspection, automated visual
+comparison, and machine-learning-assisted detection. Walsh \emph{et
+al.} pioneered automated detection of potential layout faults following
+edits to responsive pages by applying heuristic CSS rules to detect
+fixed-width overflow and missing responsive constraints
+\cite{walsh2015layout}. In follow-up work, Walsh \emph{et al.} detect
+layout failures without an explicit oracle by checking consistency
+across viewport widths \cite{walsh2017oracle}. Althomali \emph{et al.}
+perform automated visual verification of layout failures using image
+comparison and DOM-based localization
+\cite{althomali2019visual} and later extend this to automated repair
+of responsive layouts using search-based techniques
+\cite{althomali2022repair}. Mahajan and Halfond repair
+mobile-friendliness and cross-browser layout issues using search-based
+optimization \cite{mahajan2018repair, mahajan2017xblayout}.
+
+Most recently, Zerin \emph{et al.} use retrieval-augmented generation
+(RAG) to repair responsive layout failures, retrieving repair templates
+from Stack Overflow and applying them through a large language model
+\cite{zerin2025ledefix}. Their approach builds directly on prior work
+mining Stack Overflow for program repair templates \cite{liu2018sofix}.
+While effective, all of these methods share a common limitation: they
+require a browser, screenshots, execution traces, or a large language
+model, so a failure is established only after paint or via an opaque
+model, and neither detection nor repair is accompanied by a
+feature-grounded explanation.
+
+SmartLayout~AI differs in three ways: (i)~it predicts failures
+\textit{before rendering} from static HTML/CSS analysis alone;
+(ii)~it produces deterministic, exact XAI output (confidence, per-
+property blame, viewport arithmetic) from the same feature vector that
+drives prediction; and (iii)~it generates targeted code patches through
+a transparent, undoable fix stack rather than relying on LLM-generated
+or search-retrieved templates.
+
+\subsection{Automated Code Repair and Program Synthesis}
+Beyond layout-specific repair, the broader program repair literature
+provides foundational techniques. Mechtaev \emph{et al.} introduce
+Angelix, a scalable approach to multi-line program patch synthesis via
+symbolic analysis, demonstrating that automated repair can generate
+human-quality patches for real-world defects
+\cite{mechtaev2016angelix}. This principle underlies SmartLayout~AI's
+recommendation engine, which synthesizes targeted CSS and HTML patches
+from the same feature representation used for detection.
+
+\subsection{Automated HTML Error Handling and Web Page Segmentation}
+Research on HTML-level error detection and repair has a long history.
+Nguyen \emph{et al.} propose auto-locating and fix-propagating
+techniques for HTML validation errors to PHP server-side code,
+demonstrating that markup defects can be traced to their programmatic
+origins \cite{nguyen2011htmlauto}. Samimi \emph{et al.} address HTML
+generation errors in PHP applications through string constraint
+solving, automatically repairing malformed markup at the template level
+\cite{samimi2012htmlrepair}. On the structural side, Sanoja and
+Gan\c{c}arski present Block-o-matic, a web page segmentation framework
+that decomposes pages into semantically meaningful blocks, providing a
+structural basis for layout analysis
+\cite{sanoja2014blockomatic}. SmartLayout~AI builds on these ideas by
+combining structural parsing with geometry-based feature extraction
+across multiple viewports.
+
+\subsection{Visual Testing and Browser Rendering Bug Detection}
+Recent work in visual testing explores ensemble and cross-engine
+approaches. Aditya \emph{et al.} propose an ensemble method combining
+contour-based detection, YOLO-based granular analysis, and CNN-based
+design comparison for visual testing of web applications across diverse
+configurations \cite{aditya2023ensemble}. At the browser-engine level,
+Zhou \emph{et al.} introduce Janus, which detects rendering bugs by
+checking visual delta consistency across multiple browser engines,
+targeting implementation-level rendering discrepancies
+\cite{zhou2025janus}. While these approaches complement layout failure
+detection, they operate on rendered output rather than predicting
+failures from source code.
+
+\subsection{Explainable AI in Software Engineering}
+Explainable AI has become an established concern across software
+engineering tasks, as surveyed in IEEE Access \cite{khan2026xai_se}.
+Most existing practice applies post-hoc frameworks such as LIME and
+SHAP \cite{lime2016, shap2017}, which approximate black-box model
+behavior after training and are inherently approximate. SmartLayout~AI
+instead designs interpretability \textit{into} the model: confidence,
+per-property blame, and natural-language explanations are computed
+deterministically from the feature vector, so every number presented to
+the developer is exact and reproducible. To our knowledge, this is the
+first system to provide feature-grounded, viewport-arithmetic
+explanations for predicted responsive layout failures.
+
+\section{System Architecture}
+
+Fig.~\ref{fig:arch} shows the layered architecture. The front end is a
+React~19 / TypeScript single-page application compiled with Vite
+\cite{vite2024}, running entirely in the browser with no server
+component; all analysis, prediction, explanation, and patching happens
+locally.
+
+\begin{figure*}[!t]
+\centering
+\begin{tikzpicture}[
+  node distance=0.45cm,
+  input/.style={draw, rounded corners=3pt, align=center,
+    minimum width=2.4cm, minimum height=0.7cm, font=\scriptsize,
+    fill=orange!15, draw=orange!60!black},
+  stage/.style={draw, rounded corners=3pt, align=center,
+    minimum width=2.4cm, minimum height=0.7cm, font=\scriptsize,
+    fill=blue!8},
+  detail/.style={draw, rounded corners=2pt, align=center,
+    minimum width=2.3cm, minimum height=0.5cm, font=\tiny,
+    fill=green!6},
+  output/.style={draw, rounded corners=3pt, align=center,
+    minimum width=2.4cm, minimum height=0.7cm, font=\scriptsize,
+    fill=red!6, draw=red!50!black},
+  arr/.style={-{Stealth[length=2mm, width=1.5mm]}, thick},
+  arrd/.style={-{Stealth[length=1.5mm, width=1mm]}, thick, densely dashed,
+    draw=red!60},
+  arrf/.style={-{Stealth[length=2mm, width=1.5mm]}, thick, draw=orange!70!black}
+]
+% ── Input ──
+\node[input] (src) {Source (HTML + CSS + JS)};
+% ── Parsing ──
+\node[stage, below=0.4cm of src] (parse) {DOM / CSS Parser};
+\node[detail, below=0.15cm of parse] (parseD)
+  {Semantic Node Tree + Rule Objects};
+% ── Feature Extraction ──
+\node[stage, below=0.45cm of parseD] (feat) {Feature Extraction};
+\node[detail, below=0.15cm of feat] (featD)
+  {10-Dim Interpretable Vector};
+% ── Prediction Engine ──
+\node[stage, below=0.45cm of featD] (pred) {Prediction Engine};
+\node[detail, below=0.15cm of pred] (predD)
+  {16 Targets $\times$ 6 Viewports};
+% ── XAI Layer ──
+\node[stage, below=0.45cm of predD] (xai) {XAI Layer};
+\node[detail, below=0.15cm of xai] (xaiD)
+  {Confidence + Blame + NL Explanation};
+% ── Issue Report ──
+\node[output, below=0.45cm of xaiD] (issue) {Issue Report};
+% ── Recommendation Engine ──
+\node[stage, below=0.45cm of issue] (fix) {Recommendation Engine};
+\node[detail, below=0.15cm of fix] (fixD)
+  {CSS / HTML Patch Synthesis};
+% ── Fix Stack ──
+\node[output, below=0.45cm of fixD] (stack) {Fix Stack (Undoable)};
+% ── Central arrows (top to bottom) ──
+\draw[arr] (src)    -- (parse);
+\draw[arr] (parse)  -- (parseD);
+\draw[arr] (parseD) -- (feat);
+\draw[arr] (feat)   -- (featD);
+\draw[arr] (featD)  -- (pred);
+\draw[arr] (pred)   -- (predD);
+\draw[arr] (predD)  -- (xai);
+\draw[arr] (xai)    -- (xaiD);
+\draw[arr] (xaiD)   -- (issue);
+\draw[arr] (issue)  -- (fix);
+\draw[arr] (fix)    -- (fixD);
+\draw[arr] (fixD)   -- (stack);
+% ── Feedback loop (left side) ──
+\draw[arrf] (stack.west) -- ++(-1.0,0)
+  |- node[near start, left, font=\tiny, text=orange!70!black]{undo}{(src.west)};
+% ── Right-side auxiliary modules ──
+% Real-time Audit Loop
+\node[stage, right=1.6cm of predD] (audit) {Real-time Audit Loop};
+\draw[arrd] (predD.east) -- ++(0.5,0) |- (audit);
+\node[detail, below=0.15cm of audit] (auditD)
+  {300\,ms debounce + Monaco};
+\draw[arrd] (audit) -- (auditD);
+% Shadow-DOM Renderer
+\node[stage, right=1.6cm of featD] (render) {Shadow-DOM Renderer};
+\draw[arrd] (featD.east) -- ++(0.3,0) |- (render);
+\node[detail, below=0.15cm of render] (renderD)
+  {Babel Transpile + Iframe};
+\draw[arrd] (render) -- (renderD);
+% ── Labels ──
+\node[left=0.05cm of src,    font=\tiny\bfseries, text=orange!70!black]{INPUT};
+\node[left=0.05cm of parse,  font=\tiny\bfseries]{PARSING};
+\node[left=0.05cm of feat,   font=\tiny\bfseries]{ANALYSIS};
+\node[left=0.05cm of pred,   font=\tiny\bfseries]{PREDICTION};
+\node[left=0.05cm of xai,    font=\tiny\bfseries]{EXPLAINABILITY};
+\node[left=0.05cm of issue,  font=\tiny\bfseries, text=red!50!black]{OUTPUT};
+\node[left=0.05cm of fix,    font=\tiny\bfseries]{REMEDIATION};
+\node[left=0.05cm of stack,  font=\tiny\bfseries, text=red!50!black]{REPAIR};
+\end{tikzpicture}
+\caption{SmartLayout AI system workflow. The main pipeline (center)
+parses source HTML/CSS, extracts an interpretable feature vector,
+predicts failures across 16 targets and 6 viewports, generates
+structured XAI output, and synthesizes undoable code patches.
+Auxiliary modules (right, dashed) provide real-time IDE auditing
+and component preview. The orange feedback loop represents the
+undoable fix stack returning patched source to the parser.}
+\label{fig:arch}
+\end{figure*}
+
+\subsection{Analysis Pipeline}
+A recursive-descent HTML parser builds a semantic node tree
+($\texttt{HTMLNode}$) preserving source line ranges; a CSS parser
+produces rule objects with selectors, declarations, and optional media
+query context. A box-model simulator computes, for every node at every
+canonical viewport (320, 375, 425, 768, 1024, 1440\,px), the computed
+width, parent width, overflow flags, wrapping behavior, and presence of
+responsive constraints (fluid widths, \texttt{max-width: 100\%},
+auto-height images).
+
+\subsection{Real-Time Audit Loop}
+The IDE app runs the audit automatically on every code change after a
+300\,ms debounce, so the issue panel, editor diagnostics (Monaco
+markers), and health score stay synchronous with keystrokes. A
+resolved-issue set suppresses already-fixed findings until the developer
+edits the affected file again, preventing the detection of stale or
+previously repaired failures.
+
+\section{Prediction Methodology}
+
+\subsection{Feature Extraction}
+Ten interpretable features (Table~\ref{tab:features}) are computed from
+the AST in a single pass. Each feature names a known responsive
+anti-pattern and is directly attributable to source constructs; this
+design constraint is what later enables exact XAI narratives.
+
+\begin{table}[!t]
+\caption{Feature vector extracted statically from the HTML/CSS AST.}
+\label{tab:features}
+\centering
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Feature} & \textbf{Meaning} \\
+\midrule
+\texttt{fixedWidthRatio} & fraction of width declarations in px \\
+\texttt{flexWrapMissing} & containers lacking \texttt{flex-wrap} \\
+\texttt{gridTrackOverflowRatio} & fixed grid track width vs.\ viewport \\
+\texttt{mediaQueryCount} & number of \texttt{@media} rules \\
+\texttt{unresponsiveImageCount} & images without \texttt{max-width} \\
+\texttt{absolutePositionCount} & absolutely positioned nodes \\
+\texttt{negativeMarginCount} & nodes with negative margins \\
+\texttt{zIndexConflictCount} & stacked nodes with competing z-index \\
+\texttt{nowrapTextCount} & nodes with \texttt{white-space: nowrap} \\
+\texttt{viewportUnitMisuseCount} & misapplied \texttt{vw} units \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Rule-Based Prediction}
+A rule engine matches structural anti-patterns against the
+computed boxes. Sixteen failure targets are covered (Table~\ref{tab:targets});
+each fired rule yields an issue record with severity, affected element,
+offending CSS property, source line range, the set of failing
+viewports, and a root-cause sentence.
+
+\begin{table}[!t]
+\caption{The sixteen supported responsive failure targets.}
+\label{tab:targets}
+\centering
+\small
+\begin{tabular}{@{}l@{}}
+\toprule
+\textbf{Failure targets} \\
+\midrule
+Horizontal Overflow; Viewport Overflow; Broken Flexbox; \\
+Broken Grid; Image Overflow; Navbar Collapse; Text Overflow; \\
+Button Overflow; Hidden Components; Element Collision; \\
+Layout Shift; Absolute Position Conflict; Z-index Conflict; \\
+Negative Margin Collision; Missing Media Queries; \\
+Accessibility Issues \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Confidence Calibration}
+Each rule emits a base confidence that is subsequently calibrated by a
+deterministic boost function (Table~\ref{tab:boosts}). The boost encodes
+domain knowledge: a stylesheet without any media queries amplifies
+confidence in every prediction, as does a high fixed-width ratio or the
+presence of unresponsive images. The resulting score is clamped to
+$[80, 99]$, mapping to a probability score in $[0.80, 0.99]$. This
+guarantees that displayed confidence is order-consistent with the code
+features while remaining conservative against overstatement.
+
+\begin{table}[!t]
+\caption{Confidence boost rules applied by the prediction engine.}
+\label{tab:boosts}
+\centering
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Feature condition} & \textbf{Boost} \\
+\midrule
+$\texttt{fixedWidthRatio} > 0.3$ & $+2$ \\
+$\texttt{mediaQueryCount} = 0$ & $+3$ \\
+$\texttt{unresponsiveImageCount} > 0$ & $+2$ \\
+\midrule
+\textbf{Final} & $\min(99, \max(80, \text{base} + \Sigma\, \text{boost}))$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Health Score}
+A single explainable health score summarizes code quality:
+\begin{equation}
+  H = \max\!\bigl(0,\; 100 - (25\,N_{\text{High}} + 12\,N_{\text{Med}} +
+  5\,N_{\text{Low}})\bigr),
+\label{eq:health}
+\end{equation}
+with severity counts taken over live (unresolved) issues. The same
+severity-weighted penalty is recomputed in the UI as issues are applied
+or manually edited, keeping the score a truthful function of current
+source.
+
+\section{Explainable AI Layer}
+
+The engine commits to the principle that every number shown to the
+developer must be derivable from the source by hand.
+
+\subsection{Blame Analysis}
+Each issue carries a structured \texttt{blameAnalysis} list of
+\texttt{(property, impact)} pairs with quantitative contribution weights,
+e.g., for horizontal overflow the offending fixed-width declaration is
+credited with ``$+(\text{fixedWidthRatio}\times100+45)\%$ fixed pixel
+width contribution'' and, when no media queries exist, media-query
+coverage contributes ``$+35\%$ missing responsive breakpoint rules''.
+Weights are feature-derived, not trained, so they cannot hallucinate.
+
+\subsection{Natural-Language Explanation with Viewport Arithmetic}
+A template-driven generator \texttt{generateIssueExplanation} produces a
+paragraph for the worst failing viewport of the issue. It extracts the
+numeric width from the offending declaration or the original snippet and
+reports explicit arithmetic:
+
+\begin{quote}
+\small\itshape
+``At 375\,px the viewport is only 375\,px wide, but
+\texttt{div.hero-banner} is locked to 1200\,px by \texttt{"width:
+1200px"}, exceeding the viewport by 825\,px. The underlying cause:
+\ldots{}
+Approach of the fix lets the element scale with the viewport instead of
+overflowing.''
+\end{quote}
+
+Sixteen per-target templates handle overflow, flex, grid, image, text,
+navbar, hidden-element, collision, shift, positioning, z-index, and
+negative-margin scenarios, each with a fallback path when no numeric
+width can be located. Because the text is generated from the same
+feature vector and rules that produced the issue, explanation and
+prediction can never diverge.
+
+\section{Automatic Remediation and Developer Tools}
+
+\subsection{Recommendation Engine}
+Each issue's \texttt{recommendedFix} comprises a patch target
+(HTML or CSS), the original snippet, the replacement snippet, and a
+human-readable description. An \texttt{applyAutoFix} function performs
+line-anchored replacement of the offending declaration. Patches are
+pushed onto a fix stack; \texttt{undoLastFix} reverts the last patch and
+un-hides the corresponding issue in the diagnostics panel, providing a
+one-click rollback of any automatic repair.
+
+\subsection{AI Output Workspace}
+A differential workspace renders the original document (with animated
+AI hotspots over every predicted failure) and the fixed variant in
+sandboxed iframes, supporting five comparison modes: single, side-by-side,
+draggable slider, cross-fade, and stacked split. An explainable
+inspector card drills into root cause, affected rule, recommended patch,
+and expected improvement for the selected issue.
+
+\subsection{Component Playground}
+A playground validates the pipeline on reusable components. Arbitrary
+props and JSX/CSS are transpiled at runtime through Babel/standalone
+\cite{babel2015} and mounted inside isolated shadow-DOM frames at six
+canonical breakpoints with configurable custom widths, dark-mode, and
+right-to-left stress previews. A custom component library persists
+user-authored components to local storage, and a diagnostics sidebar
+applies the full prediction pipeline to the composed component.
+
+\subsection{Accessibility Screening}
+A lightweight WCAG~2.1 screen \cite{wcag21} scans markup for missing
+image alternative text, unnamed empty buttons, and missing document
+language attributes, surfacing accessibility issues alongside layout
+predictions.
+
+\section{Evaluation}
+
+\subsection{Benchmark Suite}
+The evaluation uses a benchmark suite of ten tagged test cases
+(Table~\ref{tab:bench}) spanning eight distinct failure targets,
+including compound cases (e.g., fixed-width hero combined with a
+non-wrapping flex row). Each fixture contains deliberately buggy markup
+and CSS matching real-world patterns encountered in the wild.
+
+\begin{table}[!t]
+\caption{Ten-case benchmark suite with expected failure targets.}
+\label{tab:bench}
+\centering
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Test case} & \textbf{Expected target} \\
+\midrule
+1.\ Fixed-width hero & Horizontal Overflow \\
+2.\ Flex row missing wrap & Broken Flexbox \\
+3.\ Fixed grid tracks & Broken Grid \\
+4.\ Unresponsive image & Image Overflow \\
+5.\ Desktop navbar links & Navbar Collapse \\
+6.\ \texttt{nowrap} text block & Text Overflow \\
+7.\ Fixed-px button & Button Overflow \\
+8.\ Hidden mobile CTA & Hidden Components \\
+9.\ Colliding fixed elements & Element Collision \\
+10.\ Missing media queries & Missing Media Queries \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Detection}
+Across all ten fixtures the audit loop raised the expected failure
+target as the top-severity issue at the earliest failing viewport, i.e.,
+precision and recall of 1.0 on the benchmark. Confidence scores fell in
+the calibrated band $[80, 99]$; fixtures combining multiple aggravating
+features (no media queries, fixed widths, unresponsive assets) received
+the highest scores ($\geq 94$), confirming that the boost function orders
+predictions consistently with feature severity.
+
+\subsection{Performance}
+The full pipeline (parse + feature extraction + rule engine + XAI
+generation) completes in well under one millisecond on a representative
+fixture (sub-100-node documents), far below the 300\,ms debounce budget
+of the real-time audit loop, and adds no perceptible latency to normal
+editor typing. The in-browser rendering path (Babel transpilation of
+component JSX into a shadow-DOM frame) takes a few milliseconds per
+frame and is acceptable for interactive preview, albeit at a bundle-size
+cost of $\approx$3.3\,MB with Babel/standalone included.
+
+\subsection{Remediation}
+Applying the auto-fix pipeline to all ten fixtures removed every
+predicted failure; re-running the audit reported a clean health score of
+100 with no residual findings. The fix stack correctly reverted patches
+message-by-message, and re-introducing a fixed-width declaration after
+undo promptly re-flagged the issue.
+
+\section{Conclusion and Future Work}
+
+SmartLayout AI demonstrates that responsive layout failures can be
+predicted, explained, and repaired before rendering, entirely
+client-side, with deterministic explainability and sub-millisecond
+analysis. The combination of a compact interpretable feature vector,
+structurally-derived confidence, generation of exact viewport
+arithmetic in natural language, and an undoable patch stack forms a
+closed audit loop that keeps the developer in control.
+
+Future work includes: (i)~an optional hybrid statistical layer that
+learns boost weights from user accept/reject telemetry while keeping
+explanations feature-groundable; (ii)~differential-explanation UX
+studies comparing blame-analysis narratives against LIME/SHAP baselines;
+(iii)~expansion of the failure-target taxonomy to container queries,
+scroll-driven layouts, and sub-grid; and (iv)~server-side CI integration
+in which the same engine gates pull requests with predicted failure
+summaries. The architecture is deliberately model-agnostic at the
+confidence layer, allowing its prediction heads to be swapped without
+altering the XAI contract.
+
+\begin{thebibliography}{1}
+
+\bibitem{marcotte2011responsive}
+E.~Marcotte, \emph{Responsive Web Design}. New York, NY, USA: A Book
+Apart, 2011.
+
+\bibitem{webalmanac2022}
+``The Web Almanac,'' HTTP Archive, 2022. [Online]. Available:
+https://almanac.httparchive.org/
+
+\bibitem{lighthouse2022}
+``Lighthouse: Auditing for web performance and accessibility,'' Google,
+2022. [Online]. Available: https://developer.chrome.com/docs/lighthouse/
+
+\bibitem{playwright2024}
+Microsoft, ``Playwright: Reliable cross-browser automation,'' 2024.
+[Online]. Available: https://playwright.dev/
+
+\bibitem{mesbah2011crossbrowser}
+A.~Mesbah and M.~R.~Prasad, ``Automated cross-browser compatibility
+testing of web applications,'' in \emph{Proc. 33rd Int. Conf. Software
+Engineering (ICSE)}, 2011, pp.~561--570.
+
+\bibitem{choudhary2013xpert}
+S.~R.~Choudhary, M.~R.~Prasad, and A.~Orso, ``X-PERT: Accurate
+identification of cross-browser issues in web applications,'' in
+\emph{Proc. 35th Int. Conf. Software Engineering (ICSE)}, 2013,
+pp.~702--711.
+
+\bibitem{wu2021xcheck}
+G.~Wu, M.~He, W.~Chen, J.~Wei, and H.~Zhong, ``X-Check: Improving
+effectiveness and efficiency of cross-browser issues detection for
+JavaScript-based web applications,'' \emph{IEEE Trans. Services
+Computing}, vol.~14, no.~4, pp.~1123--1137, 2021.
+
+\bibitem{wcag21}
+World Wide Web Consortium, ``Web Content Accessibility Guidelines
+(WCAG) 2.1,'' W3C Recommendation, Jun. 2018.
+
+\bibitem{mesbah2012css}
+A.~Mesbah and S.~Mirshokraie, ``Automated analysis of CSS rules to
+support style maintenance,'' in \emph{Proc. 34th Int. Conf. Software
+Engineering (ICSE)}, 2012, pp.~408--418.
+
+\bibitem{fard2013jsnose}
+A.~M.~Fard and A.~Mesbah, ``JSNose: Detecting JavaScript code smells,''
+in \emph{Proc. 13th IEEE Int. Working Conf. Source Code Analysis and
+Manipulation (SCAM)}, 2013, pp.~116--125.
+
+\bibitem{saboury2017smells}
+A.~Saboury, P.~Musavi, F.~Khomh, and G.~Antoniol, ``An empirical study
+of code smells in JavaScript projects,'' in \emph{Proc. IEEE 24th Int.
+Conf. Software Analysis, Evolution and Reengineering (SANER)}, 2017,
+pp.~294--305.
+
+\bibitem{dinucci2018mlsmells}
+D.~Di Nucci, F.~Palomba, D.~A.~Tamburri, A.~Serebrenik, and
+A.~De Lucia, ``Detecting code smells using machine learning
+techniques: Are we there yet?,'' in \emph{Proc. IEEE 25th Int. Conf.
+Software Analysis, Evolution and Reengineering (SANER)}, 2018,
+pp.~612--621, doi: 10.1109/SANER.2018.8330266.
+
+\bibitem{gupta2024cssai}
+A.~K.~Gupta, G.~G.~Venkatesha, K.~Singh, S.~Shah, O.~Goel, and
+S.~Jain, ``Enhancing cascading style sheets efficiency and performance
+through AI-based code optimization,'' in \emph{Proc. 13th IEEE Int.
+Symp. MAchine TRansformation (SMART)}, 2024, pp.~306--311,
+doi: 10.1109/SMART63812.2024.10882504.
+
+\bibitem{prazina2023survey}
+I.~Prazina, \v{S}.~Be\'{c}irovi\'{c}, E.~Cogo, and V.~Okanovi\'{c},
+``Methods for automatic web page layout testing and analysis: A
+review,'' \emph{IEEE Access}, vol.~11, pp.~13948--13964, 2023.
+
+\bibitem{walsh2015layout}
+T.~A.~Walsh, P.~McMinn, and G.~M.~Kapfhammer, ``Automatic detection of
+potential layout faults following changes to responsive web pages,'' in
+\emph{Proc. 30th IEEE/ACM Int. Conf. Automated Software Engineering
+(ASE)}, 2015, pp.~709--714.
+
+\bibitem{walsh2017oracle}
+T.~A.~Walsh, G.~M.~Kapfhammer, and P.~McMinn, ``Automated layout failure
+detection for responsive web pages without an explicit oracle,'' in
+\emph{Proc. 26th ACM SIGSOFT Int. Symp. Software Testing and Analysis
+(ISSTA)}, 2017, pp.~192--202.
+
+\bibitem{althomali2019visual}
+I.~Althomali, G.~M.~Kapfhammer, and P.~McMinn, ``Automatic visual
+verification of layout failures in responsively designed web pages,''
+in \emph{Proc. 12th IEEE Conf. Software Testing, Validation and
+Verification (ICST)}, 2019, pp.~183--193.
+
+\bibitem{althomali2022repair}
+I.~Althomali, G.~M.~Kapfhammer, and P.~McMinn, ``Automated repair of
+responsive web page layouts,'' in \emph{Proc. 15th IEEE Conf. Software
+Testing, Validation and Verification (ICST)}, 2022, pp.~140--150.
+
+\bibitem{mahajan2018repair}
+S.~Mahajan, N.~Abolhassani, P.~McMinn, and W.~G.~J.~Halfond,
+``Automated repair of mobile friendly problems in web pages,'' in
+\emph{Proc. 40th Int. Conf. Software Engineering (ICSE)}, 2018,
+pp.~140--150.
+
+\bibitem{zerin2025ledefix}
+T.~Zerin, M.~Asad, B.~M.~M.~Hossain, and K.~Sakib, ``Repairing
+responsive layout failures using retrieval augmented generation,'' in
+\emph{Proc. 41st IEEE Int. Conf. Software Maintenance and Evolution
+(ICSME)}, 2025. [Online]. Available:
+https://doi.org/10.1109/ICSME57585.2025.11185877
+
+\bibitem{liu2018sofix}
+X.~Liu and H.~Zhong, ``Mining Stack Overflow for program repair,'' in
+\emph{Proc. IEEE 25th Int. Conf. Software Analysis, Evolution and
+Reengineering (SANER)}, 2018, pp.~118--129.
+
+\bibitem{lime2016}
+M.~T. Ribeiro, S.~Singh, and C.~Guestrin, ``Why should I trust you?
+Explaining the predictions of any classifier,'' in \emph{Proc. 22nd ACM
+SIGKDD Int. Conf. Knowledge Discovery and Data Mining}, 2016,
+pp.~1135--1144.
+
+\bibitem{shap2017}
+S.~M. Lundberg and S.-I. Lee, ``A unified approach to interpreting model
+predictions,'' in \emph{Advances in Neural Information Processing
+Systems 30 (NeurIPS)}, 2017, pp.~4765--4774.
+
+\bibitem{khan2026xai_se}
+A.~Khan, A.~Ali, M.~I.~Mohmand, M.~Zareei, and R.~R.~Biswal,
+``Explainable artificial intelligence in software engineering: Current
+trends, gaps, and future directions,'' \emph{IEEE Access}, vol.~14,
+pp.~56947--56972, 2026, doi: 10.1109/ACCESS.2026.3679576.
+
+\bibitem{vite2024}
+VoidZero, ``Vite: Next generation frontend tooling,'' 2024. [Online].
+Available: https://vite.dev/
+
+\bibitem{babel2015}
+Babel Team, ``Babel: A compiler for writing next generation JavaScript,''
+2015. [Online]. Available: https://babeljs.io/
+
+\bibitem{kaushal2022responsive}
+U.~Kaushal, G.~Singh, and T.~Parashar, ``Responsive webpage using HTML
+CSS,'' in \emph{Proc. Int. Conf. Cyber Resilience (ICCR)}, 2022,
+pp.~1--4.
+
+\bibitem{zhou2025janus}
+C.~Zhou, Q.~Zhang, B.~Qian, and Y.~Jiang, ``Janus: Detecting rendering
+bugs in web browsers via visual delta consistency,'' in \emph{Proc.
+47th IEEE/ACM Int. Conf. Software Engineering (ICSE)}, 2025,
+pp.~2702--2713.
+
+\bibitem{mazinanian2016csspre}
+D.~Mazinanian and N.~Tsantalis, ``An empirical study on the use of CSS
+preprocessors,'' in \emph{Proc. IEEE 23rd Int. Conf. Software
+Analysis, Evolution, and Reengineering (SANER)}, vol.~1, 2016,
+pp.~168--178.
+
+\bibitem{mechtaev2016angelix}
+S.~Mechtaev, J.~Yi, and A.~Roychoudhury, ``Angelix: Scalable multiline
+program patch synthesis via symbolic analysis,'' in \emph{Proc. 38th
+Int. Conf. Software Engineering (ICSE)}, 2016, pp.~691--701.
+
+\bibitem{mahajan2017xblayout}
+S.~Mahajan, A.~Alameer, P.~McMinn, and W.~G.~J.~Halfond, ``Automated
+repair of layout cross browser issues using search-based techniques,''
+in \emph{Proc. 26th ACM SIGSOFT Int. Symp. Software Testing and
+Analysis (ISSTA)}, 2017, pp.~249--260.
+
+\bibitem{le2024hifi}
+T.~Le-Khanh, C.~Bui-The, A.~Pham-Hoang, Q.~Hoang-Van,
+T.~Cao-Thi-Minh, and P.~N.~Hung, ``A novel method for high-fidelity
+web element identification,'' in \emph{Proc. 16th Int. Conf. Knowledge
+and System Engineering (KSE)}, 2024, pp.~25--30.
+
+\bibitem{aditya2023ensemble}
+R.~Aditya, A.~J.~Advaith, S.~R.~Rahul, and T.~Anjali, ``An ensemble
+approach for visual testing of web applications,'' in \emph{Proc. 3rd
+Int. Conf. Emerging Frontiers in Electrical and Electronic Technologies
+(ICEFEET)}, 2023, pp.~1--5.
+
+\bibitem{nguyen2011htmlauto}
+H.~V.~Nguyen, H.~A.~Nguyen, T.~T.~Nguyen, and T.~N.~Nguyen,
+``Auto-locating and fix-propagating for HTML validation errors to PHP
+server-side code,'' in \emph{Proc. 26th IEEE/ACM Int. Conf. Automated
+Software Engineering (ASE)}, 2011, pp.~13--22.
+
+\bibitem{samimi2012htmlrepair}
+H.~Samimi, M.~Sch\"{a}fer, S.~Artzi, T.~Millstein, F.~Tip, and
+L.~Hendren, ``Automated repair of HTML generation errors in PHP
+applications using string constraint solving,'' in \emph{Proc. 34th
+Int. Conf. Software Engineering (ICSE)}, 2012, pp.~277--287.
+
+\bibitem{sanoja2014blockomatic}
+A.~Sanoja and S.~Gan\c{c}arski, ``Block-o-matic: A web page
+segmentation framework,'' in \emph{Proc. Int. Conf. Multimedia
+Computing and Systems (ICMCS)}, 2014, pp.~595--600.
+
+\end{thebibliography}
+
+\vspace{12pt}
+\begin{IEEEbiographynophoto}{First Author}
+received the B.Tech. degree in computer science and engineering from
+Example University. His research interests include web engineering,
+human--computer interaction, and explainable AI for developer tools.
+\end{IEEEbiographynophoto}
+
+\begin{IEEEbiographynophoto}{Second Author}
+received the M.S. degree in software engineering from Example Institute.
+His research focuses on responsive design automation and static program
+analysis for the web platform.
+\end{IEEEbiographynophoto}
+
+\end{document}

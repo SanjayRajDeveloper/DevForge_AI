@@ -1,0 +1,297 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-main: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-header: #ffffff;
+    --border-color: #e2e8f0;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --accent-blue: #2563eb;
+  }
+
+  .dark {
+    --bg-main: #090d16;
+    --bg-card: #111827;
+    --bg-header: #0f172a;
+    --border-color: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent-blue: #38bdf8;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+}
+
+/* Light Theme Card & Border Utilities */
+.light-app-bg {
+  background-color: #f0f6ff;
+}
+
+.light-card {
+  background-color: #ffffff;
+  border-color: #dbeafe;
+}
+
+/* Scrollbars for Light & Dark Themes */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ── Page & Element Transitions ─────────────────────────────────────────── */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-14px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
+@keyframes shimmer {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+
+.animate-fade-in-up   { animation: fade-in-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-fade-in      { animation: fade-in 0.4s ease both; }
+.animate-scale-in     { animation: scale-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-slide-in-left { animation: slide-in-left 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-float-soft   { animation: float-soft 5s ease-in-out infinite; }
+
+.animate-btn-flow {
+  background-size: 220% 220%;
+  animation: gradient-shift 2.5s ease infinite, glow-pulse 2.8s ease-in-out infinite;
+}
+
+.stagger-1 { animation-delay: 0.04s; }
+.stagger-2 { animation-delay: 0.08s; }
+.stagger-3 { animation-delay: 0.12s; }
+.stagger-4 { animation-delay: 0.16s; }
+.stagger-5 { animation-delay: 0.20s; }
+.stagger-6 { animation-delay: 0.24s; }
+
+/* ── Space Theme ────────────────────────────────────────────────────────── */
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.25; }
+}
+
+@keyframes title-shimmer {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(56, 189, 248, 0.22), 0 0 0 1px rgba(56, 189, 248, 0.12); }
+  50%      { box-shadow: 0 0 30px rgba(56, 189, 248, 0.55), 0 0 0 1px rgba(56, 189, 248, 0.35); }
+}
+
+@keyframes ring-perspective {
+  0%, 100% { transform: rotateX(72deg) rotateZ(-4deg); }
+  50%      { transform: rotateX(72deg) rotateZ(6deg); }
+}
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+
+@keyframes caret-bounce {
+  0%, 100% { transform: translateY(0); opacity: 0.55; }
+  50%      { transform: translateY(7px); opacity: 1; }
+}
+
+.animate-spin-slow    { animation: spin-slow 26s linear infinite; }
+.animate-twinkle      { animation: twinkle 3s ease-in-out infinite; }
+.animate-title-shimmer { background-size: 200% 200%; animation: title-shimmer 5.5s linear infinite; }
+.animate-glow-pulse   { animation: glow-pulse 2.8s ease-in-out infinite; }
+.animate-bob          { animation: bob 6s ease-in-out infinite; }
+.animate-caret-bounce { animation: caret-bounce 1.6s ease-in-out infinite; }
+
+@property --glow-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes glow-border {
+  0%   { --glow-angle: 0deg; }
+  100% { --glow-angle: 360deg; }
+}
+.animate-glow-border  { animation: glow-border 3s linear infinite; }
+.conic-move {
+  background: conic-gradient(from var(--glow-angle), #6d28d9, #3b82f6, #2563eb, #1d4ed8, #4c1d95, #6d28d9);
+  animation: glow-border 2.2s linear infinite;
+}
+
+.planet-ring {
+  position: absolute;
+  border-radius: 50%;
+  transform: rotateX(72deg);
+  animation: ring-perspective 9s ease-in-out infinite;
+}
+
+/* Animated gradient used by the home hero in light mode */
+.hero-animated-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 9s ease infinite;
+}
+
+/* Sheen sweep on hover for cards / buttons */
+.sheen {
+  position: relative;
+  overflow: hidden;
+}
+.sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.12) 50%, transparent 60%);
+  transform: translateX(-130%);
+  transition: transform 0.65s ease;
+  pointer-events: none;
+}
+.sheen:hover::after {
+  transform: translateX(130%);
+}
+
+/* Soft press for interactive cards */
+.pressable {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, border-color 0.2s ease;
+}
+.pressable:hover {
+  transform: translateY(-3px);
+}
+.pressable:active {
+  transform: translateY(-1px) scale(0.985);
+}
+
+/* ── Directional border-glow hover (left / right / top-bottom cards) ── */
+.spot-card {
+  position: relative;
+}
+.spot-card::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  padding: 3px;
+  background: var(--spot-bg, rgba(139, 92, 246, 0.6)) border-box;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  filter: blur(5px);
+  z-index: 0;
+}
+.spot-card:hover::before,
+.spot-card:focus-visible::before {
+  opacity: 1;
+}
+.spot-card:hover {
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.15), 0 20px 50px -12px rgba(99, 102, 241, 0.35);
+}
+
+/* ── Hover gradient border glow (violet → light blue) ── */
+.spot-glow-hover::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(120deg, #8b5cf6, #6366f1, #38bdf8, #22d3ee, #8b5cf6);
+  background-size: 300% 300%;
+  animation: title-shimmer 4s linear infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 0;
+  filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.75)) drop-shadow(0 0 22px rgba(56, 189, 248, 0.45));
+}
+.spot-glow-hover:hover::after,
+.spot-glow-hover:focus-visible::after {
+  opacity: 1;
+}
+
+/* ── IDE AI Issue Highlighting (line tints + gutter severity icons) ── */
+.sl-line-error {
+  background: rgba(244, 63, 94, 0.12);
+}
+.sl-line-warn {
+  background: rgba(245, 158, 11, 0.1);
+}
+.sl-line-info {
+  background: rgba(56, 189, 248, 0.08);
+}
+.sl-glyph-error {
+  cursor: pointer;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%23f43f5e'/><rect x='7' y='3.5' width='2' height='6' rx='1' fill='white'/><circle cx='8' cy='12' r='1.2' fill='white'/></svg>")
+    no-repeat center / 14px;
+}
+.sl-glyph-warn {
+  cursor: pointer;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M8 1.5 L15 14 L1 14 Z' fill='%23f59e0b' stroke='%23782c0d' stroke-width='0.8' stroke-linejoin='round'/><rect x='7.2' y='6' width='1.6' height='4' rx='0.8' fill='%23782c0d'/><circle cx='8' cy='12' r='1' fill='%23782c0d'/></svg>")
+    no-repeat center / 14px;
+}
+.sl-glyph-info {
+  cursor: pointer;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%2338bdf8'/><rect x='7.2' y='6.5' width='1.6' height='5.5' rx='0.8' fill='white'/><circle cx='8' cy='4' r='1.1' fill='white'/></svg>")
+    no-repeat center / 14px;
+}
