@@ -4,9 +4,9 @@ import {
   Layers, Code2, ShieldAlert, Sparkles, Sliders, ChevronUp, ChevronDown,
   Monitor, Smartphone, Tablet, Activity, FileText, CheckCircle2, AlertTriangle
 } from 'lucide-react';
-import type { LayoutIssue, ViewportBreakpoint } from '../types';
-import { VIEWPORT_NUMBERS } from '../engine/analyzer/boxModelSimulator';
-import { applyAutoFix } from '../engine/recommendations/recommendationEngine';
+import type { LayoutIssue, ViewportBreakpoint } from '../../types';
+import { VIEWPORT_NUMBERS } from '../../engine/analyzer/boxModelSimulator';
+import { applyAutoFix } from '../../engine/recommendations/recommendationEngine';
 
 interface LivePreviewProps {
   html: string;

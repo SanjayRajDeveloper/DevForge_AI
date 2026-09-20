@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import type { OnMount } from '@monaco-editor/react';
 import { Code2, FileCode, FileType, AlertTriangle, MonitorPlay, PanelsTopLeft } from 'lucide-react';
-import type { LayoutIssue } from '../types';
+import type { LayoutIssue } from '../../types';
 
 interface EditorPanelProps {
   html: string;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowLeft, Brain, AlertTriangle } from 'lucide-react';
-import { AIDiagnosticsPanel } from './AIDiagnosticsPanel';
-import type { LayoutIssue } from '../types';
+import { AIDiagnosticsPanel } from '../panels/AIDiagnosticsPanel';
+import type { LayoutIssue } from '../../types';
 
 interface AIDiagnosticsPageProps {
   issues: LayoutIssue[];

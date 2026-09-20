@@ -1,6 +1,6 @@
 import React from 'react';
 import { CheckCircle2, Wand2 } from 'lucide-react';
-import type { LayoutIssue } from '../types';
+import type { LayoutIssue } from '../../types';
 
 interface AIDiagnosticsPanelProps {
   issues: LayoutIssue[];

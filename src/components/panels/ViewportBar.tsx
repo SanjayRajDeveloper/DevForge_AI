@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ViewportBreakpoint, LayoutIssue } from '../types';
+import type { ViewportBreakpoint, LayoutIssue } from '../../types';
 import { Smartphone, Tablet, Monitor, Laptop } from 'lucide-react';
 
 interface ViewportBarProps {

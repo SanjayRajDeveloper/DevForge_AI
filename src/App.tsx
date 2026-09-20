@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { HomePage } from './components/HomePage';
-import { WorkspacesPage } from './components/WorkspacesPage';
-import { ApiTesterPage } from './components/ApiTesterPage';
-import type { HomeAction } from './components/workspaceActions';
-import { EditorPanel } from './components/EditorPanel';
-import { AIDiagnosticsPage } from './components/AIDiagnosticsPage';
+import {
+  HomePage,
+  WorkspacesPage,
+  ApiTesterPage,
+  EditorPanel,
+  AIDiagnosticsPage,
+  OutputWorkspace,
+  type HomeAction
+} from './components';
 import { Playground } from './playground/Playground';
-import { OutputWorkspace } from './components/OutputWorkspace';
 
 import { IEEE_TEST_CASES } from './engine/testSuites/testCases';
 import type { LayoutIssue } from './types';

@@ -1,8 +1,8 @@
 import React from 'react';
 import { ArrowRight, Rocket } from 'lucide-react';
-import { SpaceBackground } from './SpaceBackground';
-import { SaturnPlanet } from './SaturnPlanet';
-import type { HomeAction } from './workspaceActions';
+import { SpaceBackground } from '../backgrounds/SpaceBackground';
+import { SaturnPlanet } from '../backgrounds/SaturnPlanet';
+import type { HomeAction } from '../common/WorkspaceActions';
 
 interface HomePageProps {
   theme: 'light' | 'dark';

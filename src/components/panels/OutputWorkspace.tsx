@@ -9,9 +9,9 @@ import {
   Brain,
   PanelsTopLeft
 } from 'lucide-react';
-import type { LayoutIssue, ViewportBreakpoint } from '../types';
-import { VIEWPORT_NUMBERS } from '../engine/analyzer/boxModelSimulator';
-import { applyAutoFix } from '../engine/recommendations/recommendationEngine';
+import type { LayoutIssue, ViewportBreakpoint } from '../../types';
+import { VIEWPORT_NUMBERS } from '../../engine/analyzer/boxModelSimulator';
+import { applyAutoFix } from '../../engine/recommendations/recommendationEngine';
 import { ViewportBar } from './ViewportBar';
 
 interface OutputWorkspaceProps {

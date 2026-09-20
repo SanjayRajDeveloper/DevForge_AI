@@ -1,6 +1,6 @@
 import React from 'react';
-import { IEEE_TEST_CASES } from '../engine/testSuites/testCases';
-import type { TestCase } from '../types';
+import { IEEE_TEST_CASES } from '../../engine/testSuites/testCases';
+import type { TestCase } from '../../types';
 import { Layers } from 'lucide-react';
 
 interface TestCaseSelectorProps {
@@ -34,7 +34,7 @@ export const TestCaseSelector: React.FC<TestCaseSelectorProps> = ({
       <select
         value={selectedId}
         onChange={(e) => {
-          const found = IEEE_TEST_CASES.find((tc) => tc.id === e.target.value);
+          const found = IEEE_TEST_CASES.find((tc: TestCase) => tc.id === e.target.value);
           if (found) onSelectTestCase(found);
         }}
         className={`rounded-lg px-3 py-1 text-xs font-medium focus:outline-none cursor-pointer border ${
@@ -43,7 +43,7 @@ export const TestCaseSelector: React.FC<TestCaseSelectorProps> = ({
             : 'bg-slate-950 text-slate-200 border-slate-800 focus:border-indigo-500'
         }`}
       >
-        {IEEE_TEST_CASES.map((tc) => (
+        {IEEE_TEST_CASES.map((tc: TestCase) => (
           <option key={tc.id} value={tc.id} className={isLight ? 'bg-white text-slate-900' : 'bg-slate-900 text-slate-100'}>
             {tc.name} [{tc.category}]
           </option>

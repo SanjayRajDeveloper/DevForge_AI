@@ -1,11 +1,9 @@
 import React from 'react';
 import { Home } from 'lucide-react';
-import { getWorkspaceActions, WorkspaceCard, type HomeAction } from './workspaceActions';
-import { CardCarousel } from './CardCarousel';
+import { getWorkspaceActions, WorkspaceCard, type HomeAction } from '../common/WorkspaceActions';
+import { CardCarousel } from '../common/CardCarousel';
 
-const BirdsBackground = React.lazy(() =>
-  import('./BirdsBackground').then(m => ({ default: m.BirdsBackground }))
-);
+import { BirdsBackground } from '../backgrounds/BirdsBackground';
 
 interface WorkspacesPageProps {
   theme: 'light' | 'dark';
@@ -25,11 +23,7 @@ export const WorkspacesPage: React.FC<WorkspacesPageProps> = ({
       style={{ background: 'linear-gradient(180deg, #070d28 0%, #0b1536 45%, #050b24 100%)' }}
     >
       {/* Bird flock background */}
-      <React.Suspense
-        fallback={<div className="absolute inset-0 w-full h-full bg-[#0b1536]" />}
-      >
-        <BirdsBackground className="absolute inset-0 w-full h-full" />
-      </React.Suspense>
+      <BirdsBackground className="absolute inset-0 w-full h-full" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(2,6,23,0.35)_82%,rgba(2,6,23,0.8)_100%)] pointer-events-none" />
 
       <div className="relative p-4 md:p-6 lg:p-8 flex flex-col items-center justify-center min-h-full">

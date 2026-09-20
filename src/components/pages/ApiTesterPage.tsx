@@ -18,7 +18,7 @@ import {
   type HttpMethod,
   type ApiTestRequest,
   type ApiTestResponse,
-} from '../engine/api/repoEndpoints';
+} from '../../engine/api/repoEndpoints';
 
 const METHOD_COLORS: Record<HttpMethod, { chip: string; text: string }> = {
   GET: { chip: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/40', text: 'text-emerald-500' },
